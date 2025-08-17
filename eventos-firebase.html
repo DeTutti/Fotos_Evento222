@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Galería de Eventos</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <!-- Firebase (necesario) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+  <style>
+    :root {
+      --color-primario: #2c3e50;
+      --color-secundario: #ecf0f1;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      background: var(--color-primario) url('https://placehold.co/1920x1080?text=EVENTO') center/cover fixed;
+      margin: 0;
+      padding: 0;
+      color: white;
+    }
+    #adminPanel { display: none; background: rgba(0,0,0,0.8); padding: 15px; }
+    #galeria { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 10px; }
+    .foto { height: 150px; border-radius: 8px; overflow: hidden; position: relative; }
+    .foto img { width: 100%; height: 100%; object-fit: cover; }
+    .eliminar { position: absolute; top: 5px; right: 5px; background: red; color: white; border: none; border-radius: 50%; width: 25px; height: 25px; }
+    #slideshow { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 100; }
+    #slideshow img { width: 100%; height: 100%; object-fit: contain; }
+  </style>
+</head>
+<body>
+  <!-- Panel de Admin (solo tú) -->
+  <div id="adminPanel">
+    <h2>ADMIN</h2>
+    <button onclick="mostrarSubida()">Cambiar Fondo</button>
+    <button onclick="eliminarTodas()">Borrar Todas</button>
+    <button onclick="iniciarSlideshow()">Mostrar Slideshow</button>
+    <input type="file" id="bgInput" accept="image/*" style="display: none;">
+  </div>
+
+  <!-- Botón flotante para admin -->
+  <button id="adminBtn" onclick="toggleAdmin()" style="position: fixed; top: 10px; right: 10px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px;">⚙️</button>
+
+  <!-- Contenido principal -->
+  <div style="text-align: center; padding: 15px;">
+    <h1 id="nombreEvento">EVENTO</h1>
+    <input type="file" id="fotoInput" accept="image/*" multiple style="display: none;">
+    <button onclick="document.getElementById('fotoInput').click()" style="background: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-size: 16px;">Subir Foto</button>
+    <div id="galeria"></div>
+  </div>
+
+  <!-- Slideshow -->
+  <div id="slideshow"></div>
+
+  <script>
+    // ⚠️ REEMPLAZA CON TUS DATOS DE FIREBASE ⚠️
+    const firebaseConfig = {
+      apiKey: "TU_API_KEY",
+      authDomain: "TU_PROYECTO.firebaseapp.com",
+      projectId: "TU_PROYECTO",
+      storageBucket: "TU_PROYECTO.appspot.com",
+      messagingSenderId: "NUMEROS",
+      appId: "APP_ID"
+    };
+
+    // Inicializar Firebase
+    firebase.initializeApp(firebaseConfig);
+    const storage = firebase.storage();
+
+    // Variables globales
+    let fotos = [];
+    const ADMIN_PASS = "admin123"; // Cambia esta contraseña
+
+    // Función para subir fotos
+    document.getElementById('fotoInput').onchange = async (e) => {
+      const files = e.target.files;
+      for (const file of files) {
+        const storageRef = storage.ref(`fotos/${Date.now()}_${file.name}`);
+        await storageRef.put(file);
+        const url = await storageRef.getDownloadURL();
+        fotos.push(url);
+        mostrarFoto(url);
+      }
+    };
+
+    // Mostrar foto en galería
+    function mostrarFoto(url) {
+      const div = document.createElement('div');
+      div.className = 'foto';
+      div.innerHTML = `<img src="${url}" alt="Foto del evento">`;
+      document.getElementById('galeria').appendChild(div);
+    }
+
+    // Panel de administrador
+    function toggleAdmin() {
+      const pass = prompt("Contraseña de admin:");
+      if (pass === ADMIN_PASS) {
+        document.getElementById('adminPanel').style.display = 
+          document.getElementById('adminPanel').style.display === 'block' ? 'none' : 'block';
+      }
+    }
+
+    // Eliminar todas las fotos (solo admin)
+    async function eliminarTodas() {
+      if (confirm("¿Borrar TODAS las fotos?")) {
+        const list = await storage.ref('fotos').listAll();
+        list.items.forEach(file => file.delete());
+        document.getElementById('galeria').innerHTML = '';
+        fotos = [];
+      }
+    }
+
+    // Cambiar fondo
+    function mostrarSubida() {
+      document.getElementById('bgInput').click();
+    }
+    document.getElementById('bgInput').onchange = (e) => {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        document.body.style.backgroundImage = `url(${event.target.result})`;
+      };
+      reader.readAsDataURL(file);
+    };
+
+    // Slideshow automático
+    function iniciarSlideshow() {
+      if (fotos.length === 0) return alert("No hay fotos");
+      const slideshow = document.getElementById('slideshow');
+      slideshow.style.display = 'block';
+      let index = 0;
+      slideshow.innerHTML = `<img src="${fotos[index]}" alt="Slideshow">`;
+      setInterval(() => {
+        index = (index + 1) % fotos.length;
+        slideshow.innerHTML = `<img src="${fotos[index]}" alt="Slideshow">`;
+      }, 3000);
+    }
+
+    // Cargar fotos al iniciar
+    window.onload = async () => {
+      const list = await storage.ref('fotos').listAll();
+      for (const file of list.items) {
+        const url = await file.getDownloadURL();
+        fotos.push(url);
+        mostrarFoto(url);
+      }
+    };
+  </script>
+</body>
+</html>
