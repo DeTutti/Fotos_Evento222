@@ -1,468 +1,307 @@
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Foto Eventos - Sistema de Fotos Compartidas</title>
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js"></script>
-  <script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript"></script>
-  
+  <title>Galería de Eventos</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
-    .photo-card {
-      transition: all 0.3s ease;
-      animation: fadeIn 0.5s;
+    :root {
+      --color-fondo: #0f4c75;
+      --color-texto: white;
+      --color-botones: #3282b8;
     }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+
+    body {
+      font-family: 'Arial', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: var(--color-fondo) url('https://placehold.co/1920x1080?text=Fondo+Evento') center/cover no-repeat fixed;
+      color: var(--color-texto);
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
     }
-    #qrCodeContainer canvas {
-      width: 100% !important;
-      height: auto !important;
+
+    body::after {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.7);
+      z-index: -1;
     }
-    .tab-content {
+
+    #adminPanel {
+      background: rgba(0, 0, 0, 0.8);
+      padding: 15px;
+      border-radius: 10px;
+      margin: 10px;
       display: none;
     }
-    .tab-content.active {
-      display: block;
+
+    #galeria {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 10px;
+      padding: 10px;
+      max-height: 60vh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .foto {
+      position: relative;
+      height: 150px;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+
+    .foto img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .btn {
+      background: var(--color-botones);
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 5px;
+      margin: 5px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    #slideshow {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: black;
+      display: none;
+      z-index: 100;
+    }
+
+    #slideshow img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .control-btn {
+      position: fixed;
+      bottom: 20px;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      font-size: 24px;
+      z-index: 101;
+    }
+
+    #startBtn {
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    #stopBtn {
+      right: 20px;
+      bottom: 20px;
+      display: none;
     }
   </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-  <!-- Menú de navegación -->
-  <nav class="bg-blue-600 text-white p-4 shadow-lg">
-    <div class="container mx-auto flex justify-between items-center">
-      <h1 class="text-2xl font-bold">💎 FotoEventos</h1>
-      <div class="flex space-x-4">
-        <button onclick="showTab('admin')" class="px-4 py-2 rounded hover:bg-blue-700 transition">
-          <i class="fas fa-cog mr-2"></i>Administrar
-        </button>
-        <button onclick="showTab('viewer')" class="px-4 py-2 rounded hover:bg-blue-700 transition">
-          <i class="fas fa-images mr-2"></i>Galería
-        </button>
-        <button onclick="showTab('upload')" class="px-4 py-2 rounded hover:bg-blue-700 transition">
-          <i class="fas fa-qrcode mr-2"></i>QR para Invitados
-        </button>
-      </div>
-    </div>
-  </nav>
-
-  <div class="container mx-auto p-4">
-    <!-- Panel de Administración -->
-    <div id="admin" class="tab-content bg-white rounded-lg shadow-md p-6 mb-6 active">
-      <h2 class="text-2xl font-bold mb-6 text-blue-800">Administración del Evento</h2>
-      
-      <div class="grid md:grid-cols-2 gap-6">
-        <!-- Configuración del Evento -->
-        <div class="border border-gray-200 rounded-lg p-4">
-          <h3 class="text-xl font-semibold mb-4">Nuevo Evento</h3>
-          <div class="space-y-4">
-            <div>
-              <label class="block text-gray-700 mb-1">Nombre del Evento</label>
-              <input type="text" id="eventName" class="w-full p-2 border rounded" placeholder="Ej: Boda de Ana y Luis">
-            </div>
-            <div>
-              <label class="block text-gray-700 mb-1">Fecha del Evento</label>
-              <input type="date" id="eventDate" class="w-full p-2 border rounded">
-            </div>
-            <button onclick="saveEventSettings()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition w-full">
-              Guardar Configuración
-            </button>
-          </div>
-        </div>
-        
-        <!-- Gestión de Fotos -->
-        <div class="border border-gray-200 rounded-lg p-4">
-          <h3 class="text-xl font-semibold mb-4">Gestión de Fotos</h3>
-          <div class="space-y-4">
-            <div>
-              <p class="text-gray-600 mb-2">Total de fotos actuales: <span id="photoCount" class="font-bold">0</span></p>
-              <p class="text-gray-600">Uso de almacenamiento: <span id="storageUsage" class="font-bold">0 MB</span></p>
-            </div>
-            <button onclick="deleteAllPhotos()" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition w-full">
-              <i class="fas fa-trash mr-2"></i>Borrar Todas las Fotos
-            </button>
-            <button onclick="exportPhotos()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition w-full">
-              <i class="fas fa-download mr-2"></i>Exportar Fotos
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Visor de Galería -->
-    <div id="viewer" class="tab-content">
-      <div class="flex justify-between items-center mb-6">
-        <h2 class="text-2xl font-bold text-blue-800">Galería del Evento</h2>
-        <div class="flex items-center space-x-2">
-          <span id="currentEventName" class="font-semibold text-gray-700"></span>
-          <span id="currentEventDate" class="text-sm text-gray-500"></span>
-        </div>
-      </div>
-      
-      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" id="photoGallery">
-        <!-- Las fotos aparecerán aquí -->
-      </div>
-      
-      <div id="emptyGallery" class="text-center py-12">
-        <img src="https://placehold.co/400x300?text=No+hay+fotos+a%C3%BAn" alt="Galería vacía con icono de cámara y mensaje indicando que no hay fotos" class="mx-auto mb-4 rounded-lg">
-        <h3 class="text-xl font-semibold text-gray-700">No hay fotos en la galería</h3>
-        <p class="text-gray-500 mb-4">Comparte el código QR con tus invitados para que suban fotos</p>
-      </div>
-    </div>
-
-    <!-- Panel de Subida QR -->
-    <div id="upload" class="tab-content">
-      <div class="bg-white rounded-lg shadow-md p-6">
-        <h2 class="text-2xl font-bold mb-6 text-blue-800">QR para Invitados</h2>
-        
-        <div class="grid md:grid-cols-2 gap-8">
-          <div>
-            <h3 class="text-xl font-semibold mb-4">Subida de Fotos</h3>
-            <p class="text-gray-600 mb-4">Comparte este código QR con los invitados para que puedan subir fotos directamente desde sus teléfonos.</p>
-            
-            <div class="bg-white p-4 rounded border border-gray-200 flex justify-center mb-4">
-              <div id="qrCodeContainer"></div>
-            </div>
-            
-            <div class="mb-4">
-              <label class="block text-gray-700 mb-1">O copia este enlace:</label>
-              <div class="flex">
-                <input type="text" id="uploadLink" class="flex-1 p-2 border rounded-l" readonly>
-                <button onclick="copyUploadLink()" class="bg-blue-600 text-white px-4 py-2 rounded-r hover:bg-blue-700 transition">
-                  Copiar
-                </button>
-              </div>
-            </div>
-          </div>
-          
-          <div>
-            <h3 class="text-xl font-semibold mb-4">Previsualización de Subida</h3>
-            <p class="text-gray-600 mb-4">Así es como se verá la pantalla de subida para los invitados:</p>
-            
-            <div class="bg-gray-800 p-6 rounded-lg text-white">
-              <h4 class="text-lg font-semibold mb-2">Subir foto al evento: <span id="previewEventName" class="text-blue-300">Mi Evento</span></h4>
-              <div class="flex justify-center my-6">
-                <button id="upload_widget" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-full shadow-lg transition flex items-center">
-                  <i class="fas fa-camera mr-2"></i> Subir Foto
-                </button>
-              </div>
-              <p class="text-sm text-gray-400 text-center">Las fotos aparecerán automáticamente en la pantalla del evento</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+<body>
+  <!-- Panel de administrador (solo visible para ti) -->
+  <div id="adminPanel">
+    <h2>Panel de Control</h2>
+    <button class="btn" onclick="toggleAdmin()">Ocultar</button>
+    <input type="file" id="bgImage" accept="image/*" style="display: none;">
+    <button class="btn" onclick="document.getElementById('bgImage').click()">Cambiar Fondo</button>
+    <button class="btn" onclick="deleteAllPhotos()">Borrar Todas</button>
+    <button class="btn" onclick="saveData()">Guardar Evento</button>
+    <button class="btn" onclick="loadData()">Cargar Evento</button>
   </div>
 
-  <!-- Notificaciones flotantes -->
-  <div id="notification" class="fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg hidden z-50 transition-all duration-300">
-    <span id="notificationMessage"></span>
+  <!-- Botón flotante para acceder al panel admin -->
+  <button class="btn" id="adminBtn" onclick="toggleAdmin()" style="position: fixed; top: 10px; right: 10px; z-index: 99;">⚙️</button>
+
+  <!-- Contenedor principal -->
+  <div id="mainContent">
+    <h1 id="eventTitle" style="text-align: center; padding: 10px;">Mi Evento</h1>
+    
+    <!-- Subida de fotos -->
+    <div style="text-align: center; margin: 10px;">
+      <input type="file" id="photoInput" accept="image/*" multiple style="display: none;" onchange="uploadPhotos()">
+      <button class="btn" onclick="document.getElementById('photoInput').click()">Subir Fotos</button>
+    </div>
+    
+    <!-- Galería -->
+    <div id="galeria"></div>
   </div>
+
+  <!-- Slideshow -->
+  <div id="slideshow"></div>
+  <button id="startBtn" class="btn control-btn" onclick="startSlideshow()">▶️</button>
+  <button id="stopBtn" class="btn control-btn" onclick="stopSlideshow()">⏹️</button>
 
   <script>
-    // Configuración inicial
-    let currentEvent = {
-      name: "Mi Evento",
-      date: new Date().toISOString().split('T')[0],
-      photos: []  // Este array se llenará con las fotos del evento
-    };
-
-    // Al cargar la página
-    document.addEventListener('DOMContentLoaded', function() {
-      loadEventSettings();
-      renderPhotoGallery();
-      generateQRCode();
-      setupCloudinaryUpload();
+    // Variables
+    let fotos = [];
+    let slideshowInterval;
+    let currentSlide = 0;
+    const ADMIN_PASSWORD = "evento123"; // Cambia esto por tu contraseña
+    
+    // Cargar al iniciar
+    document.addEventListener('DOMContentLoaded', () => {
+      loadPhotos();
+      document.getElementById('bgImage').addEventListener('change', changeBackground);
     });
 
-    // Mostrar diferentes pestañas
-    function showTab(tabId) {
-      document.querySelectorAll('.tab-content').forEach(tab => {
-        tab.classList.remove('active');
-      });
-      document.getElementById(tabId).classList.add('active');
-    }
-
-    // Cargar configuración del evento desde localStorage
-    function loadEventSettings() {
-      const savedEvent = localStorage.getItem('currentEvent');
-      if (savedEvent) {
-        currentEvent = JSON.parse(savedEvent);
-        document.getElementById('eventName').value = currentEvent.name;
-        document.getElementById('eventDate').value = currentEvent.date;
-        document.getElementById('currentEventName').textContent = currentEvent.name;
-        document.getElementById('currentEventDate').textContent = formatDate(currentEvent.date);
-        document.getElementById('previewEventName').textContent = currentEvent.name;
-      }
-      
-      // Cargar fotos del evento
-      const savedPhotos = localStorage.getItem('eventPhotos');
-      if (savedPhotos) {
-        currentEvent.photos = JSON.parse(savedPhotos);
-        updatePhotoCount();
+    // Funciones principales
+    function toggleAdmin() {
+      const panel = document.getElementById('adminPanel');
+      const pass = prompt("Ingresa la contraseña de administrador:");
+      if (pass === ADMIN_PASSWORD) {
+        panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+      } else if (pass !== null) {
+        alert("Contraseña incorrecta");
       }
     }
 
-    // Guardar configuración del evento
-    function saveEventSettings() {
-      currentEvent.name = document.getElementById('eventName').value || "Mi Evento";
-      currentEvent.date = document.getElementById('eventDate').value || new Date().toISOString().split('T')[0];
-      
-      localStorage.setItem('currentEvent', JSON.stringify(currentEvent));
-      
-      // Actualizar vistas
-      document.getElementById('currentEventName').textContent = currentEvent.name;
-      document.getElementById('currentEventDate').textContent = formatDate(currentEvent.date);
-      document.getElementById('previewEventName').textContent = currentEvent.name;
-      
-      // Regenerar QR con nuevo nombre de evento
-      generateQRCode();
-      
-      showNotification('Configuración guardada correctamente');
-    }
-
-    // Configurar el widget de subida de Cloudinary
-    function setupCloudinaryUpload() {
-      const cloudinarySettings = {
-        cloudName: 'dqa5mwdmq', // CAMBIAR por tu cloud name de Cloudinary
-        uploadPreset: 'event_photos', // CAMBIAR por tu upload preset
-        sources: ['local', 'camera', 'url'],
-        multiple: false,
-        cropping: false,
-        showPoweredBy: false,
-        styles: {
-          palette: {
-            window: "#FFFFFF",
-            windowBorder: "#90A0B3",
-            tabIcon: "#0078FF",
-            menuIcons: "#5A616A",
-            textDark: "#000000",
-            textLight: "#FFFFFF",
-            link: "#0078FF",
-            action: "#FF620C",
-            inactiveTabIcon: "#0E2F5A",
-            error: "#F44235",
-            inProgress: "#0078FF",
-            complete: "#20B832",
-            sourceBg: "#E4EBF1"
-          },
-          fonts: {
-            default: null,
-            "'Poppins', sans-serif": {
-              url: "https://fonts.googleapis.com/css?family=Poppins",
-              active: true
-            }
-          }
+    function uploadPhotos() {
+      const files = document.getElementById('photoInput').files;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+          const foto = {
+            id: Date.now() + i,
+            url: e.target.result,
+            name: file.name
+          };
+          fotos.push(foto);
+          mostrarFoto(foto);
+          savePhotos();
         }
-      };
-
-      const uploadButton = document.getElementById('upload_widget');
-      
-      uploadButton.addEventListener('click', function() {
-        cloudinary.openUploadWidget(cloudinarySettings, (error, result) => {
-          if (!error && result && result.event === 'success') {
-            // Guardar la nueva foto
-            const newPhoto = {
-              id: Date.now(),
-              url: result.info.secure_url,
-              timestamp: new Date().toISOString()
-            };
-            
-            currentEvent.photos.push(newPhoto);
-            savePhotosToStorage();
-            
-            // Solo para demostración - en producción usarías SSE o websockets
-            if (document.getElementById('viewer').classList.contains('active')) {
-              addPhotoToGallery(newPhoto);
-            }
-            
-            showNotification('¡Nueva foto agregada al evento!');
-          }
-        });
-      }, false);
-    }
-
-    // Guardar fotos en localStorage
-    function savePhotosToStorage() {
-      localStorage.setItem('eventPhotos', JSON.stringify(currentEvent.photos));
-      updatePhotoCount();
-    }
-
-    // Actualizar contador de fotos
-    function updatePhotoCount() {
-      document.getElementById('photoCount').textContent = currentEvent.photos.length;
-      
-      // Calcular uso de almacenamiento estimado (0.5MB por foto)
-      const storageMB = (currentEvent.photos.length * 0.5).toFixed(2);
-      document.getElementById('storageUsage').textContent = storageMB + ' MB';
-    }
-
-    // Renderizar galería de fotos
-    function renderPhotoGallery() {
-      const gallery = document.getElementById('photoGallery');
-      const emptyGallery = document.getElementById('emptyGallery');
-      
-      gallery.innerHTML = '';
-      
-      if (currentEvent.photos.length === 0) {
-        emptyGallery.classList.remove('hidden');
-        return;
+        reader.readAsDataURL(file);
       }
-      
-      emptyGallery.classList.add('hidden');
-      
-      currentEvent.photos.forEach(photo => {
-        addPhotoToGallery(photo);
-      });
     }
 
-    // Añadir una foto a la galería
-    function addPhotoToGallery(photo) {
-      const gallery = document.getElementById('photoGallery');
-      const emptyGallery = document.getElementById('emptyGallery');
-      
-      emptyGallery.classList.add('hidden');
-      
-      const photoCard = document.createElement('div');
-      photoCard.className = 'photo-card';
-      photoCard.innerHTML = `
-        <div class="bg-white rounded-lg shadow-md overflow-hidden">
-          <img src="${photo.url}" alt="Foto del evento subida por invitado" class="w-full h-48 object-cover">
-          <div class="p-3">
-            <p class="text-gray-500 text-sm">${formatTime(photo.timestamp)}</p>
-            <button onclick="deletePhoto(${photo.id})" class="text-red-600 hover:text-red-800 text-sm mt-2">
-              <i class="fas fa-trash mr-1"></i>Eliminar
-            </button>
-          </div>
-        </div>
-      `;
-      
-      gallery.prepend(photoCard);
+    function mostrarFoto(foto) {
+      const galeria = document.getElementById('galeria');
+      const div = document.createElement('div');
+      div.className = 'foto';
+      div.innerHTML = `<img src="${foto.url}" alt="Foto del evento">`;
+      galeria.appendChild(div);
     }
 
-    // Borrar una foto específica
-    function deletePhoto(photoId) {
-      Swal.fire({
-        title: '¿Eliminar foto?',
-        text: "Esta acción no se puede deshacer",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#d33',
-        cancelButtonColor: '#3085d6',
-        confirmButtonText: 'Sí, eliminar',
-        cancelButtonText: 'Cancelar'
-      }).then((result) => {
-        if (result.isConfirmed) {
-          currentEvent.photos = currentEvent.photos.filter(photo => photo.id !== photoId);
-          savePhotosToStorage();
-          renderPhotoGallery();
-          showNotification('Foto eliminada correctamente');
-        }
-      });
-    }
-
-    // Borrar todas las fotos
     function deleteAllPhotos() {
-      Swal.fire({
-        title: '¿Eliminar TODAS las fotos?',
-        text: "Esta acción no se puede deshacer y borrará todas las fotos del evento actual",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#d33',
-        cancelButtonColor: '#3085d6',
-        confirmButtonText: 'Sí, eliminar todo',
-        cancelButtonText: 'Cancelar'
-      }).then((result) => {
-        if (result.isConfirmed) {
-          currentEvent.photos = [];
-          savePhotosToStorage();
-          renderPhotoGallery();
-          showNotification('Todas las fotos han sido eliminadas');
-        }
-      });
-    }
-
-    // Exportar fotos (descargar enlace para cada foto)
-    function exportPhotos() {
-      if (currentEvent.photos.length === 0) {
-        showNotification('No hay fotos para exportar');
-        return;
-      }
-      
-      let exportContent = `Fotos del evento: ${currentEvent.name}\n\n`;
-      currentEvent.photos.forEach(photo => {
-        exportContent += `${photo.url}\n`;
-      });
-      
-      const blob = new Blob([exportContent], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `fotos-eventos-${currentEvent.name.replace(/\s+/g, '-')}.txt`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      showNotification(`Exportadas ${currentEvent.photos.length} fotos`);
-    }
-
-    // Generar código QR para compartir
-    function generateQRCode() {
-      const qrContainer = document.getElementById('qrCodeContainer');
-      qrContainer.innerHTML = '';
-      
-      // Cambia esta URL por la de tu aplicación en producción
-      const uploadUrl = `${window.location.origin}${window.location.pathname}?upload=true`;
-      document.getElementById('uploadLink').value = uploadUrl;
-      
-      const qr = qrcode(0, 'L');
-      qr.addData(uploadUrl);
-      qr.make();
-      qrContainer.innerHTML = qr.createImgTag(4);
-      
-      // Si estamos en modo "upload" (cuando los invitados escanean el QR)
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('upload') === 'true') {
-        showTab('upload');
-        document.getElementById('upload_widget').scrollIntoView({ behavior: 'smooth' });
+      if (confirm("¿Borrar TODAS las fotos? Esto no se puede deshacer.")) {
+        fotos = [];
+        document.getElementById('galeria').innerHTML = '';
+        localStorage.removeItem('eventPhotos');
       }
     }
 
-    // Copiar enlace de subida
-    function copyUploadLink() {
-      const linkInput = document.getElementById('uploadLink');
-      linkInput.select();
-      document.execCommand('copy');
-      showNotification('Enlace copiado al portapapeles');
+    function savePhotos() {
+      localStorage.setItem('eventPhotos', JSON.stringify(fotos));
     }
 
-    // Mostrar notificación
-    function showNotification(message) {
-      const notification = document.getElementById('notification');
-      const messageElement = document.getElementById('notificationMessage');
+    function loadPhotos() {
+      const saved = localStorage.getItem('eventPhotos');
+      if (saved) {
+        fotos = JSON.parse(saved);
+        fotos.forEach(foto => mostrarFoto(foto));
+      }
+    }
+
+    function changeBackground(e) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        document.body.style.backgroundImage = `url(${event.target.result})`;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Slideshow
+    function startSlideshow() {
+      if (fotos.length === 0) return alert("No hay fotos para mostrar");
       
-      messageElement.textContent = message;
-      notification.classList.remove('hidden');
+      document.getElementById('slideshow').style.display = 'block';
+      document.getElementById('mainContent').style.display = 'none';
+      document.getElementById('startBtn').style.display = 'none';
+      document.getElementById('stopBtn').style.display = 'block';
       
-      setTimeout(() => {
-        notification.classList.add('hidden');
+      showSlide(0);
+      
+      slideshowInterval = setInterval(() => {
+        currentSlide = (currentSlide + 1) % fotos.length;
+        showSlide(currentSlide);
       }, 3000);
     }
 
-    // Formatear fecha
-    function formatDate(dateString) {
-      const options = { year: 'numeric', month: 'long', day: 'numeric' };
-      return new Date(dateString).toLocaleDateString('es-ES', options);
+    function showSlide(index) {
+      const slideshow = document.getElementById('slideshow');
+      slideshow.innerHTML = `<img src="${fotos[index].url}" alt="Presentación de fotos">`;
     }
 
-    // Formatear hora
-    function formatTime(isoString) {
-      return new Date(isoString).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    function stopSlideshow() {
+      clearInterval(slideshowInterval);
+      document.getElementById('slideshow').style.display = 'none';
+      document.getElementById('mainContent').style.display = 'block';
+      document.getElementById('startBtn').style.display = 'block';
+      document.getElementById('stopBtn').style.display = 'none';
+    }
+
+    // Exportar/Importar datos
+    function saveData() {
+      const data = {
+        fotos: fotos,
+        fondo: document.body.style.backgroundImage,
+        titulo: document.getElementById('eventTitle').textContent
+      };
+      
+      const blob = new Blob([JSON.stringify(data)], {type: 'application/json'});
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'evento_data.json';
+      a.click();
+    }
+
+    function loadData() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      
+      input.onchange = e => {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        
+        reader.onload = event => {
+          try {
+            const data = JSON.parse(event.target.result);
+            fotos = data.fotos || [];
+            document.body.style.backgroundImage = data.fondo || '';
+            document.getElementById('eventTitle').textContent = data.titulo || 'Mi Evento';
+            document.getElementById('galeria').innerHTML = '';
+            fotos.forEach(foto => mostrarFoto(foto));
+          } catch (err) {
+            alert("Error al cargar el archivo");
+          }
+        };
+        
+        reader.readAsText(file);
+      };
+      
+      input.click();
     }
   </script>
 </body>
